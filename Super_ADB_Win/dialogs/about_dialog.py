@@ -28,7 +28,7 @@ from ui.ui_styles import FONT_FAMILY, THEMES, DEFAULT_THEME, _parse_rgb
 from ui.dialog_styles import 无边框缩放Mixin
 from tools.adb_tools import 加载json配置
 
-VERSION = 'v2026.09.01'
+VERSION = 'v2026.09.02'
 GITHUB_REPO_URL = 'https://github.com/17602121645/Super_ADB.git'
 
 
