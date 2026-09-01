@@ -37,12 +37,37 @@ _datas = [
 if os.path.isdir(_EXT_DIR):
     _datas.append((_EXT_DIR, 'vendor'))
 
+# ★ 与 Super_ADB_MAC/build_tools/Super_ADB_mac.spec、Super_ADB_Win/build_tools/Super_ADB.spec
+# 保持同步，缺一不可。此前本文件只声明了前 6 项，导致：
+#   - 缺 png_rc / ui.png_rc → ui/Super_ADB.py:26 的裸 import png_rc 在冻结后找不到模块，
+#     打包产物启动即 ModuleNotFoundError（CI 冒烟测试抓到的就是这个）
+#   - 缺 cryptography.* → adb pair 配对客户端顶层 import 崩溃，手机扫码后一直转圈
+#   - 缺 usb.* → 自研 adb 的 USB 通道不可用
+#   - 缺 mdns_discovery → 无线调试找不到 _adb-tls-connect 真实调试端口
+_hiddenimports = [
+    'segno', 'segno.helpers', 'zeroconf', 'ifaddr', 'pyzbar', 'tools.favorite_combobox',
+    'png_rc', 'ui.png_rc',
+    'cryptography', 'cryptography.hazmat',
+    'cryptography.hazmat.primitives', 'cryptography.hazmat.primitives.asymmetric',
+    'cryptography.hazmat.primitives.asymmetric.rsa',
+    'cryptography.hazmat.primitives.asymmetric.padding',
+    'cryptography.hazmat.primitives.serialization',
+    'cryptography.hazmat.primitives.hashes', 'cryptography.hazmat.backends',
+    'tools.adb_native.mdns_discovery',
+    'usb', 'usb.core', 'usb.util', 'usb.backend.libusb1',
+]
+try:
+    import brotli  # noqa: F401
+    _hiddenimports.append('brotli')
+except ImportError:
+    pass
+
 a = Analysis(
     [_ENTRY],
     pathex=[_PROJECT_ROOT],
     binaries=[],
     datas=_datas,
-    hiddenimports=['segno', 'segno.helpers', 'zeroconf', 'ifaddr', 'pyzbar', 'tools.favorite_combobox'],
+    hiddenimports=_hiddenimports,
     hookspath=[os.path.join(_SPEC_DIR, 'hooks')],
     hooksconfig={},
     runtime_hooks=[os.path.join(_SPEC_DIR, 'hooks', 'runtime_pyzbar.py')],

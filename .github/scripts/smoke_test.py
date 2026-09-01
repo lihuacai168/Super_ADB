@@ -24,6 +24,14 @@ import subprocess
 import sys
 import time
 
+# Windows 控制台默认 cp1252，脚本里的中文 print 会直接 UnicodeEncodeError 把步骤搞挂。
+# 在脚本内根治，而不是要求每个调用方去设 PYTHONIOENCODING。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass
+
 IS_MAC = sys.platform == 'darwin'
 IS_WIN = sys.platform == 'win32'
 IS_LINUX = sys.platform.startswith('linux')
