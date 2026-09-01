@@ -64,7 +64,11 @@ except ImportError:
 
 a = Analysis(
     [_ENTRY],
-    pathex=[_PROJECT_ROOT],
+    # ui 目录必须入 pathex：ui/Super_ADB.py 是 Qt Designer 产物，里面是裸的
+    # `import png_rc`，而 png_rc.py 位于 ui/ 下。只在 hiddenimports 里写
+    # 'png_rc' 不够 —— PyInstaller 得先能按这个名字找到它。
+    # Windows 的 spec 用的同样是这个办法；mac 则靠 hooks/runtime_pkg_alias.py。
+    pathex=[_PROJECT_ROOT, os.path.join(_PROJECT_ROOT, 'ui')],
     binaries=[],
     datas=_datas,
     hiddenimports=_hiddenimports,
