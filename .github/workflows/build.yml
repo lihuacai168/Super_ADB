@@ -90,6 +90,9 @@ jobs:
       # spec 不含 config/，需补写 build_info，否则「关于」页无下载地址
       - name: Write build info
         working-directory: Super_ADB_Win
+        # build_exe 里的 print 是中文，Windows 控制台默认 cp1252 会 UnicodeEncodeError
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           python -c "import sys; sys.path.insert(0,'build_tools'); import build_exe; build_exe._写入打包完成时间('.', 'Super_ADB')"
           if (-not (Test-Path build_tools/dist/Super_ADB/config/build_info.json)) { exit 1 }
