@@ -161,22 +161,47 @@ info "生成 ZIP 压缩包（UTF-8 安全，保留权限/符号链接）..."
 if [[ ! -f "$ZIP_PATH" ]]; then
     error "ZIP 生成失败"
 fi
-# 校验：ZIP 必须含 config/build_info.json 与 libusb（避免 ditto 丢中文目录的坑）
-"$PYTHON" - "$ZIP_PATH" <<'PY'
-import sys, zipfile
-z = zipfile.ZipFile(sys.argv[1])
+# 校验 ZIP：关键文件齐全 + 符号链接一条不少。
+# 曾经踩过的坑：make_zip.py 漏掉「指向目录的符号链接」（os.walk 把它们归在 dirs 里），
+# 丢掉 Contents/Frameworks/python3.X 后 app 启动即 ModuleNotFoundError: '_struct'，
+# 而当时的自检只查两个文件名是否存在，一路绿灯发到了 Release。
+"$PYTHON" - "$APP_PATH" "$ZIP_PATH" <<'ZIPCHECK'
+import os, sys, stat, zipfile
+
+app, zip_path = sys.argv[1], sys.argv[2]
+z = zipfile.ZipFile(zip_path)
 names = z.namelist()
-has_info = any('config/build_info.json' in n for n in names)
-has_libusb = any('libusb-1.0.dylib' in n for n in names)
-print('  zip 含 config/build_info.json:', has_info)
-print('  zip 含 libusb-1.0.dylib  :', has_libusb)
-if not (has_info and has_libusb):
-    print('FAIL: zip 缺关键文件')
-    sys.exit(1)
-print('OK: zip 关键文件齐全')
-PY
+
+ok = True
+for needle in ('config/build_info.json', 'libusb-1.0.dylib'):
+    hit = any(needle in n for n in names)
+    print('  zip 含 %-24s: %s' % (needle, hit))
+    ok = ok and hit
+
+# 源 .app 里的符号链接（含指向目录的）必须一条不落地进 zip
+parent = os.path.dirname(os.path.abspath(app))
+src_links = set()
+for root, dirs, files in os.walk(app):
+    for n in list(dirs) + list(files):
+        fp = os.path.join(root, n)
+        if os.path.islink(fp):
+            src_links.add(os.path.relpath(fp, parent))
+zip_links = {i.filename for i in z.infolist() if stat.S_ISLNK(i.external_attr >> 16)}
+missing = sorted(src_links - zip_links)
+print('  符号链接：源 %d 条 / zip %d 条 / 缺失 %d 条'
+      % (len(src_links), len(zip_links), len(missing)))
+for m in missing[:10]:
+    print('    缺失: %s' % m)
+if len(missing) > 10:
+    print('    ...（另有 %d 条）' % (len(missing) - 10))
+if missing:
+    ok = False
+
+print('OK: zip 校验通过' if ok else 'FAIL: zip 校验未通过')
+sys.exit(0 if ok else 1)
+ZIPCHECK
 if [[ $? -ne 0 ]]; then
-    error "ZIP 缺少关键文件（config/build_info.json 或 libusb），请检查 make_zip.py"
+    error "ZIP 校验未通过（缺关键文件或丢符号链接），请检查 make_zip.py"
 fi
 ZIP_SIZE=$(du -h "$ZIP_PATH" | cut -f1)
 ok "ZIP 生成完成: $ZIP_PATH (${ZIP_SIZE})"

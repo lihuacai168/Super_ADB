@@ -2,9 +2,9 @@
 """
 UTF-8 安全的 .app -> zip 打包助手（替代 macOS 自带 ditto）。
 
-为什么不用 ditto：macOS 自带 ditto/zip 对非 ASCII（中文）目录名会整目录
-丢失，导致 config/build_info.json 等中文路径文件不进 zip。本脚本用 Python
-zipfile（UTF-8 路径）打包，并保留：
+为什么不用 ditto：历史上目录名含中文时，macOS 自带 ditto/zip 会整目录丢失。
+目录名现已全部英文化，该顾虑不再成立，但本脚本可精确控制权限与符号链接，
+故保留。本脚本用 Python zipfile（UTF-8 路径）打包，并保留：
   - Unix 文件权限（含启动器 EXE 的 +x 位，否则解压后无法启动）
   - 符号链接（如 外部扩展 内、Resources/libusb-1.0.dylib -> Frameworks 的链接）
 
@@ -47,7 +47,18 @@ def main():
             zf.writestr(dinfo, b'')
             count += 1
 
-            for fn in sorted(files):
+            # os.walk 把「指向目录的符号链接」归到 dirs，而 followlinks=False 时
+            # 既不下沉、也不会出现在 files 里 —— 不单独捞出来就会被整条丢掉。
+            # .app 里这类链接是必需的，丢了直接起不来：
+            #   Contents/Frameworks/python3.X -> python3__dot__X
+            #       （丢 → ModuleNotFoundError: No module named '_struct'）
+            #   Contents/Frameworks/*.framework/Versions/Current -> A
+            #   Contents/Frameworks/vendor/scrcpy/<ver> -> <ver 带 __dot__>
+            link_dirs = [d for d in dirs if os.path.islink(os.path.join(root, d))]
+            if link_dirs:
+                dirs[:] = [d for d in dirs if d not in link_dirs]
+
+            for fn in sorted(link_dirs) + sorted(files):
                 fp = os.path.join(root, fn)
                 rel = os.path.relpath(fp, app_parent)
                 st = os.lstat(fp)

@@ -43,14 +43,19 @@ jobs:
 
       - name: Build
         working-directory: Super_ADB_Linux
-        run: bash build_tools/build_linux.sh --clean --archive
+        run: bash build_tools/build_linux.sh --clean
 
-      - name: Normalise artifact name
-        working-directory: Super_ADB_Linux/build_tools/dist
+      # build_linux.sh 不调用 build_exe，产物里不会有 config/build_info.json，
+      # 「关于」页的下载地址就是空的。补写后再打归档。
+      - name: Write build info
+        working-directory: Super_ADB_Linux
         run: |
-          src=$(ls Super_ADB_linux_*.tar.gz | head -1)
-          mv "$src" Super_ADB-linux-x86_64.tar.gz
-          ls -lh Super_ADB-linux-x86_64.tar.gz
+          python -c "import sys; sys.path.insert(0,'build_tools'); import build_exe; build_exe._写入打包完成时间('.', 'Super_ADB')"
+          test -f build_tools/dist/Super_ADB/config/build_info.json
+
+      - name: Archive
+        working-directory: Super_ADB_Linux/build_tools/dist
+        run: tar -czf Super_ADB-linux-x86_64.tar.gz Super_ADB
 
       - uses: actions/upload-artifact@v4
         with:
@@ -81,6 +86,14 @@ jobs:
           pyinstaller --noconfirm --clean
           --distpath build_tools/dist --workpath build_tools/build
           build_tools/Super_ADB.spec
+
+      # spec 不含 config/，需补写 build_info，否则「关于」页无下载地址
+      - name: Write build info
+        working-directory: Super_ADB_Win
+        run: |
+          python -c "import sys; sys.path.insert(0,'build_tools'); import build_exe; build_exe._写入打包完成时间('.', 'Super_ADB')"
+          if (-not (Test-Path build_tools/dist/Super_ADB/config/build_info.json)) { exit 1 }
+        shell: pwsh
 
       - name: Zip bundle
         working-directory: Super_ADB_Win/build_tools/dist
