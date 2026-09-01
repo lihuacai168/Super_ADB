@@ -172,6 +172,11 @@ def main():
     ap.add_argument('--report-dir', default='', help='失败时把现场写到这里，供 CI 上传')
     args = ap.parse_args()
 
+    # 立刻转绝对路径：launch() 会给子进程传 cwd=，相对路径在切目录后就失效了
+    args.extracted_dir = os.path.abspath(args.extracted_dir)
+    if args.report_dir:
+        args.report_dir = os.path.abspath(args.report_dir)
+
     print('=== Super_ADB 打包产物冒烟测试 ===')
     print('平台: %s (%s / %s)' % (LAYOUT['name'], sys.platform, platform.machine()))
     print('解压目录: %s' % args.extracted_dir)
